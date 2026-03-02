@@ -11,6 +11,7 @@ tokei = { version = "14", default-features = false }
 ignore = "0.4"
 globset = "0.4"
 strip-ansi-escapes = "0.2"
+regex = "1"
 
 [dev-dependencies.cargo-husky]
 version = "1"

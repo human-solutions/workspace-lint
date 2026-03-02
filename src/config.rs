@@ -14,12 +14,12 @@ pub struct Config {
     pub freshness: Option<FreshnessConfig>,
     #[serde(default)]
     pub expand: Option<ExpandConfig>,
+    #[serde(default, rename = "cli-crate-version")]
+    pub cli_crate_version: Option<CliCrateVersionConfig>,
 }
 
 #[derive(Deserialize, Default)]
 pub struct Checks {
-    #[serde(default, rename = "wasm-bindgen-version")]
-    pub wasm_bindgen_version: bool,
     #[serde(default, rename = "workspace-deps")]
     pub workspace_deps: bool,
 }
@@ -36,6 +36,19 @@ pub struct ExpandRule {
     pub marker: String,
     #[serde(default, rename = "auto-stage")]
     pub auto_stage: bool,
+}
+
+#[derive(Deserialize)]
+pub struct CliCrateVersionConfig {
+    pub rules: Vec<CliCrateVersionRule>,
+}
+
+#[derive(Deserialize)]
+pub struct CliCrateVersionRule {
+    pub command: Vec<String>,
+    pub pattern: String,
+    #[serde(rename = "crate")]
+    pub crate_name: String,
 }
 
 #[derive(Deserialize)]
@@ -132,7 +145,6 @@ mod tests {
     fn parse_full_config() {
         let toml = r#"
 [checks]
-wasm-bindgen-version = true
 workspace-deps = true
 
 [[file-size.rules]]
@@ -162,10 +174,14 @@ command = ["mise", "tasks"]
 glob = "CLAUDE.md"
 marker = "MISE_TASKS"
 auto-stage = true
+
+[[cli-crate-version.rules]]
+command = ["wasm-bindgen", "--version"]
+pattern = "wasm-bindgen (\\S+)"
+crate = "wasm-bindgen"
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
-        assert!(config.checks.wasm_bindgen_version);
         assert!(config.checks.workspace_deps);
 
         let fs_rules = config.file_size.unwrap().rules;
@@ -193,28 +209,33 @@ auto-stage = true
         assert_eq!(ex_rules[0].glob, "CLAUDE.md");
         assert_eq!(ex_rules[0].marker, "MISE_TASKS");
         assert!(ex_rules[0].auto_stage);
+
+        let cv_rules = config.cli_crate_version.unwrap().rules;
+        assert_eq!(cv_rules.len(), 1);
+        assert_eq!(cv_rules[0].command, &["wasm-bindgen", "--version"]);
+        assert_eq!(cv_rules[0].pattern, "wasm-bindgen (\\S+)");
+        assert_eq!(cv_rules[0].crate_name, "wasm-bindgen");
     }
 
     #[test]
     fn parse_empty_config_defaults_all_disabled() {
         let config: Config = toml::from_str("").unwrap();
-        assert!(!config.checks.wasm_bindgen_version);
         assert!(!config.checks.workspace_deps);
         assert!(config.file_size.is_none());
         assert!(config.crate_size.is_none());
         assert!(config.freshness.is_none());
         assert!(config.expand.is_none());
+        assert!(config.cli_crate_version.is_none());
     }
 
     #[test]
     fn parse_partial_checks() {
         let toml = r#"
 [checks]
-wasm-bindgen-version = true
+workspace-deps = true
 "#;
         let config: Config = toml::from_str(toml).unwrap();
-        assert!(config.checks.wasm_bindgen_version);
-        assert!(!config.checks.workspace_deps);
+        assert!(config.checks.workspace_deps);
     }
 
     #[test]

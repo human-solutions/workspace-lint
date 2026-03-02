@@ -1,9 +1,9 @@
+mod cli_crate_version;
 mod config;
 mod crate_size;
 mod expand;
 mod file_size;
 mod freshness;
-mod wasm_bindgen_version;
 mod workspace_deps;
 
 pub(crate) struct Issue {
@@ -28,8 +28,8 @@ fn main() {
 
     let mut issues = Vec::new();
 
-    if config.checks.wasm_bindgen_version {
-        issues.extend(wasm_bindgen_version::check());
+    if let Some(ref cv) = config.cli_crate_version {
+        issues.extend(cli_crate_version::check(cv));
     }
     if config.checks.workspace_deps {
         issues.extend(workspace_deps::check());
