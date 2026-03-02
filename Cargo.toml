@@ -7,6 +7,9 @@ edition = "2024"
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
 fs-err = "3"
+tokei = { version = "14", default-features = false }
+ignore = "0.4"
+globset = "0.4"
 
 [dev-dependencies.cargo-husky]
 version = "1"
