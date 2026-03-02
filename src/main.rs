@@ -1,10 +1,10 @@
+mod centralized_deps;
 mod cli_crate_version;
 mod config;
 mod crate_size;
 mod expand;
 mod file_size;
 mod freshness;
-mod workspace_deps;
 
 pub(crate) struct Issue {
     pub title: String,
@@ -31,8 +31,8 @@ fn main() {
     if let Some(ref cv) = config.cli_crate_version {
         issues.extend(cli_crate_version::check(cv));
     }
-    if config.checks.workspace_deps {
-        issues.extend(workspace_deps::check());
+    if config.checks.centralized_deps {
+        issues.extend(centralized_deps::check());
     }
     if let Some(ref fc) = config.freshness {
         issues.extend(freshness::check(fc));

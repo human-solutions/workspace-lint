@@ -20,8 +20,8 @@ pub struct Config {
 
 #[derive(Deserialize, Default)]
 pub struct Checks {
-    #[serde(default, rename = "workspace-deps")]
-    pub workspace_deps: bool,
+    #[serde(default, rename = "centralized-deps")]
+    pub centralized_deps: bool,
 }
 
 #[derive(Deserialize)]
@@ -145,7 +145,7 @@ mod tests {
     fn parse_full_config() {
         let toml = r#"
 [checks]
-workspace-deps = true
+centralized-deps = true
 
 [[file-size.rules]]
 glob = "**/*.rs"
@@ -182,7 +182,7 @@ crate = "wasm-bindgen"
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
-        assert!(config.checks.workspace_deps);
+        assert!(config.checks.centralized_deps);
 
         let fs_rules = config.file_size.unwrap().rules;
         assert_eq!(fs_rules.len(), 2);
@@ -220,7 +220,7 @@ crate = "wasm-bindgen"
     #[test]
     fn parse_empty_config_defaults_all_disabled() {
         let config: Config = toml::from_str("").unwrap();
-        assert!(!config.checks.workspace_deps);
+        assert!(!config.checks.centralized_deps);
         assert!(config.file_size.is_none());
         assert!(config.crate_size.is_none());
         assert!(config.freshness.is_none());
@@ -232,10 +232,10 @@ crate = "wasm-bindgen"
     fn parse_partial_checks() {
         let toml = r#"
 [checks]
-workspace-deps = true
+centralized-deps = true
 "#;
         let config: Config = toml::from_str(toml).unwrap();
-        assert!(config.checks.workspace_deps);
+        assert!(config.checks.centralized_deps);
     }
 
     #[test]
