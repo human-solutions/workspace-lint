@@ -1,8 +1,8 @@
 mod config;
 mod crate_size;
+mod expand;
 mod file_size;
 mod freshness;
-mod mise_tasks;
 mod wasm_bindgen_version;
 mod workspace_deps;
 
@@ -22,8 +22,8 @@ fn main() {
         return;
     }
 
-    if config.checks.mise_tasks {
-        mise_tasks::check(); // auto-fixes, exits on hard error only
+    if let Some(ref ec) = config.expand {
+        expand::run(ec);
     }
 
     let mut issues = Vec::new();

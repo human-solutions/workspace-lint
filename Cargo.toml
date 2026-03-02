@@ -10,6 +10,7 @@ fs-err = "3"
 tokei = { version = "14", default-features = false }
 ignore = "0.4"
 globset = "0.4"
+strip-ansi-escapes = "0.2"
 
 [dev-dependencies.cargo-husky]
 version = "1"

@@ -12,16 +12,30 @@ pub struct Config {
     pub crate_size: Option<CrateSizeConfig>,
     #[serde(default)]
     pub freshness: Option<FreshnessConfig>,
+    #[serde(default)]
+    pub expand: Option<ExpandConfig>,
 }
 
 #[derive(Deserialize, Default)]
 pub struct Checks {
-    #[serde(default, rename = "mise-tasks")]
-    pub mise_tasks: bool,
     #[serde(default, rename = "wasm-bindgen-version")]
     pub wasm_bindgen_version: bool,
     #[serde(default, rename = "workspace-deps")]
     pub workspace_deps: bool,
+}
+
+#[derive(Deserialize)]
+pub struct ExpandConfig {
+    pub rules: Vec<ExpandRule>,
+}
+
+#[derive(Deserialize)]
+pub struct ExpandRule {
+    pub command: Vec<String>,
+    pub glob: String,
+    pub marker: String,
+    #[serde(default, rename = "auto-stage")]
+    pub auto_stage: bool,
 }
 
 #[derive(Deserialize)]
@@ -118,7 +132,6 @@ mod tests {
     fn parse_full_config() {
         let toml = r#"
 [checks]
-mise-tasks = true
 wasm-bindgen-version = true
 workspace-deps = true
 
@@ -143,10 +156,15 @@ include = ["*.rs", "*.ts"]
 [[freshness.rules]]
 glob = "**/CLAUDE.md"
 depends-on = "**/*.rs"
+
+[[expand.rules]]
+command = ["mise", "tasks"]
+glob = "CLAUDE.md"
+marker = "MISE_TASKS"
+auto-stage = true
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
-        assert!(config.checks.mise_tasks);
         assert!(config.checks.wasm_bindgen_version);
         assert!(config.checks.workspace_deps);
 
@@ -168,28 +186,34 @@ depends-on = "**/*.rs"
         assert_eq!(fr_rules.len(), 1);
         assert_eq!(fr_rules[0].glob, "**/CLAUDE.md");
         assert_eq!(fr_rules[0].depends_on, "**/*.rs");
+
+        let ex_rules = config.expand.unwrap().rules;
+        assert_eq!(ex_rules.len(), 1);
+        assert_eq!(ex_rules[0].command, &["mise", "tasks"]);
+        assert_eq!(ex_rules[0].glob, "CLAUDE.md");
+        assert_eq!(ex_rules[0].marker, "MISE_TASKS");
+        assert!(ex_rules[0].auto_stage);
     }
 
     #[test]
     fn parse_empty_config_defaults_all_disabled() {
         let config: Config = toml::from_str("").unwrap();
-        assert!(!config.checks.mise_tasks);
         assert!(!config.checks.wasm_bindgen_version);
         assert!(!config.checks.workspace_deps);
         assert!(config.file_size.is_none());
         assert!(config.crate_size.is_none());
         assert!(config.freshness.is_none());
+        assert!(config.expand.is_none());
     }
 
     #[test]
     fn parse_partial_checks() {
         let toml = r#"
 [checks]
-mise-tasks = true
+wasm-bindgen-version = true
 "#;
         let config: Config = toml::from_str(toml).unwrap();
-        assert!(config.checks.mise_tasks);
-        assert!(!config.checks.wasm_bindgen_version);
+        assert!(config.checks.wasm_bindgen_version);
         assert!(!config.checks.workspace_deps);
     }
 
@@ -201,9 +225,22 @@ glob = "**/*.rs"
 max-code-lines = 400
 "#;
         let config: Config = toml::from_str(toml).unwrap();
-        assert!(!config.checks.mise_tasks);
         let rules = config.file_size.unwrap().rules;
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].max_code_lines, 400);
+    }
+
+    #[test]
+    fn parse_expand_defaults() {
+        let toml = r#"
+[[expand.rules]]
+command = ["echo", "hello"]
+glob = "README.md"
+marker = "HELLO"
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let rules = config.expand.unwrap().rules;
+        assert_eq!(rules.len(), 1);
+        assert!(!rules[0].auto_stage);
     }
 }
