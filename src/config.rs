@@ -16,6 +16,8 @@ pub struct Config {
     pub expand: Option<ExpandConfig>,
     #[serde(default, rename = "cli-crate-version")]
     pub cli_crate_version: Option<CliCrateVersionConfig>,
+    #[serde(default, rename = "unused-deps")]
+    pub unused_deps: Option<UnusedDepsConfig>,
 }
 
 #[derive(Deserialize, Default)]
@@ -49,6 +51,12 @@ pub struct CliCrateVersionRule {
     pub pattern: String,
     #[serde(rename = "crate")]
     pub crate_name: String,
+}
+
+#[derive(Deserialize, Default)]
+pub struct UnusedDepsConfig {
+    #[serde(default)]
+    pub ignore: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -179,6 +187,9 @@ auto-stage = true
 command = ["wasm-bindgen", "--version"]
 pattern = "wasm-bindgen (\\S+)"
 crate = "wasm-bindgen"
+
+[unused-deps]
+ignore = ["prost", "tonic"]
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -215,6 +226,9 @@ crate = "wasm-bindgen"
         assert_eq!(cv_rules[0].command, &["wasm-bindgen", "--version"]);
         assert_eq!(cv_rules[0].pattern, "wasm-bindgen (\\S+)");
         assert_eq!(cv_rules[0].crate_name, "wasm-bindgen");
+
+        let ud = config.unused_deps.unwrap();
+        assert_eq!(ud.ignore, &["prost", "tonic"]);
     }
 
     #[test]
@@ -226,6 +240,7 @@ crate = "wasm-bindgen"
         assert!(config.freshness.is_none());
         assert!(config.expand.is_none());
         assert!(config.cli_crate_version.is_none());
+        assert!(config.unused_deps.is_none());
     }
 
     #[test]
@@ -249,6 +264,16 @@ max-code-lines = 400
         let rules = config.file_size.unwrap().rules;
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].max_code_lines, 400);
+    }
+
+    #[test]
+    fn parse_unused_deps_defaults() {
+        let toml = r#"
+[unused-deps]
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let ud = config.unused_deps.unwrap();
+        assert!(ud.ignore.is_empty());
     }
 
     #[test]

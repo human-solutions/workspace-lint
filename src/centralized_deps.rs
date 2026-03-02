@@ -1,7 +1,6 @@
-use crate::Issue;
+use crate::{Issue, workspace};
 use fs_err as fs;
 use std::collections::BTreeSet;
-use std::path::Path;
 
 pub fn check() -> Vec<Issue> {
     let root_toml = fs::read_to_string("Cargo.toml").unwrap_or_else(|e| {
@@ -15,8 +14,8 @@ pub fn check() -> Vec<Issue> {
     });
 
     let workspace_dep_names = extract_workspace_dep_names(&root);
-    let member_patterns = extract_member_patterns(&root);
-    let member_dirs = expand_member_patterns(&member_patterns);
+    let member_patterns = workspace::extract_member_patterns(&root);
+    let member_dirs = workspace::expand_member_patterns(&member_patterns);
 
     let mut issues = Vec::new();
 
@@ -128,44 +127,4 @@ fn extract_workspace_dep_names(root: &toml::Value) -> BTreeSet<String> {
         .and_then(|d| d.as_table())
         .map(|table| table.keys().cloned().collect())
         .unwrap_or_default()
-}
-
-fn extract_member_patterns(root: &toml::Value) -> Vec<String> {
-    root.get("workspace")
-        .and_then(|w| w.get("members"))
-        .and_then(|m| m.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn expand_member_patterns(patterns: &[String]) -> Vec<std::path::PathBuf> {
-    let mut dirs = Vec::new();
-
-    for pattern in patterns {
-        if pattern.contains('*') {
-            // Simple glob: "crates/server/*" → list entries in "crates/server/"
-            let parent = pattern.trim_end_matches("/*").trim_end_matches("\\*");
-            let parent_path = Path::new(parent);
-            if let Ok(entries) = fs::read_dir(parent_path) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() && path.join("Cargo.toml").exists() {
-                        dirs.push(path);
-                    }
-                }
-            }
-        } else {
-            let path = Path::new(pattern);
-            if path.is_dir() {
-                dirs.push(path.to_path_buf());
-            }
-        }
-    }
-
-    dirs.sort();
-    dirs
 }

@@ -5,6 +5,8 @@ mod crate_size;
 mod expand;
 mod file_size;
 mod freshness;
+mod unused_deps;
+mod workspace;
 
 pub(crate) struct Issue {
     pub title: String,
@@ -42,6 +44,9 @@ fn main() {
     }
     if let Some(ref fc) = config.crate_size {
         issues.extend(crate_size::check(fc));
+    }
+    if let Some(ref uc) = config.unused_deps {
+        issues.extend(unused_deps::check(uc));
     }
 
     if issues.is_empty() {
