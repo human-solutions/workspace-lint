@@ -170,16 +170,21 @@ fn parse_config(toml_str: &str, source: &str) -> Config {
     })
 }
 
-/// Read the `[workspace.metadata.workspace-lint]` section from Cargo.toml,
+/// Extract the `[workspace.metadata.workspace-lint]` section from raw Cargo.toml content,
 /// re-serialized as a standalone TOML string so we can deserialize it into Config.
-fn read_cargo_metadata() -> Option<String> {
-    let content = fs::read_to_string("Cargo.toml").ok()?;
-    let doc: toml::Value = content.parse().ok()?;
+fn extract_metadata_section(cargo_toml_content: &str) -> Option<String> {
+    let doc: toml::Value = cargo_toml_content.parse().ok()?;
     let section = doc
         .get("workspace")?
         .get("metadata")?
         .get("workspace-lint")?;
     Some(toml::to_string(section).expect("failed to re-serialize workspace-lint metadata"))
+}
+
+/// Read the `[workspace.metadata.workspace-lint]` section from Cargo.toml.
+fn read_cargo_metadata() -> Option<String> {
+    let content = fs::read_to_string("Cargo.toml").ok()?;
+    extract_metadata_section(&content)
 }
 
 #[cfg(test)]
@@ -379,6 +384,134 @@ cargo-features = ["feat1", "feat2"]
             up.cargo_features,
             CargoFeatures::List(vec!["feat1".to_string(), "feat2".to_string()])
         );
+    }
+
+    #[test]
+    fn parse_crate_size_no_include() {
+        let toml = r#"
+[[crate-size.rules]]
+glob = "crates/*"
+max-code-lines = 5000
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let rules = config.crate_size.unwrap().rules;
+        assert!(rules[0].include.is_none());
+    }
+
+    #[test]
+    fn parse_multiple_freshness_rules() {
+        let toml = r#"
+[[freshness.rules]]
+glob = "**/CLAUDE.md"
+depends-on = "**/*.rs"
+
+[[freshness.rules]]
+glob = "**/README.md"
+depends-on = "**/*.ts"
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let rules = config.freshness.unwrap().rules;
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[1].glob, "**/README.md");
+    }
+
+    #[test]
+    fn parse_unknown_keys_are_ignored() {
+        let toml = r#"
+[checks]
+centralized-deps = true
+unknown-future-check = true
+"#;
+        // serde default ignores unknown keys (no deny_unknown_fields)
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(config.checks.centralized_deps);
+    }
+
+    #[test]
+    fn parse_cli_crate_version_multiple_rules() {
+        let toml = r#"
+[[cli-crate-version.rules]]
+command = ["tool-a", "--version"]
+pattern = "(\\S+)"
+crate = "tool-a"
+
+[[cli-crate-version.rules]]
+command = ["tool-b", "--version"]
+pattern = "v(\\S+)"
+crate = "tool-b"
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let rules = config.cli_crate_version.unwrap().rules;
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[1].crate_name, "tool-b");
+    }
+
+    // --- extract_metadata_section ---
+
+    #[test]
+    fn extract_metadata_with_checks() {
+        let cargo_toml = r#"
+[workspace]
+members = ["crates/*"]
+
+[workspace.metadata.workspace-lint]
+[workspace.metadata.workspace-lint.checks]
+centralized-deps = true
+"#;
+        let raw = extract_metadata_section(cargo_toml).unwrap();
+        let config: Config = toml::from_str(&raw).unwrap();
+        assert!(config.checks.centralized_deps);
+    }
+
+    #[test]
+    fn extract_metadata_with_rules() {
+        let cargo_toml = r#"
+[workspace]
+members = []
+
+[workspace.metadata.workspace-lint]
+
+[[workspace.metadata.workspace-lint.file-size.rules]]
+glob = "**/*.rs"
+max-code-lines = 500
+"#;
+        let raw = extract_metadata_section(cargo_toml).unwrap();
+        let config: Config = toml::from_str(&raw).unwrap();
+        let rules = config.file_size.unwrap().rules;
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].glob, "**/*.rs");
+        assert_eq!(rules[0].max_code_lines, 500);
+    }
+
+    #[test]
+    fn extract_metadata_returns_none_no_workspace() {
+        let cargo_toml = r#"
+[package]
+name = "foo"
+version = "0.1.0"
+"#;
+        assert!(extract_metadata_section(cargo_toml).is_none());
+    }
+
+    #[test]
+    fn extract_metadata_returns_none_no_metadata() {
+        let cargo_toml = r#"
+[workspace]
+members = ["crates/*"]
+"#;
+        assert!(extract_metadata_section(cargo_toml).is_none());
+    }
+
+    #[test]
+    fn extract_metadata_returns_none_no_lint_section() {
+        let cargo_toml = r#"
+[workspace]
+members = ["crates/*"]
+
+[workspace.metadata.other-tool]
+key = "value"
+"#;
+        assert!(extract_metadata_section(cargo_toml).is_none());
     }
 
     #[test]

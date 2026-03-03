@@ -88,7 +88,10 @@ fn read_lock_packages() -> Vec<(String, String)> {
         eprintln!("failed to read Cargo.lock: {e}");
         std::process::exit(1);
     });
+    parse_lock_packages(&content)
+}
 
+fn parse_lock_packages(content: &str) -> Vec<(String, String)> {
     let doc: toml::Value = content.parse().unwrap_or_else(|e| {
         eprintln!("failed to parse Cargo.lock: {e}");
         std::process::exit(1);
@@ -107,4 +110,125 @@ fn read_lock_packages() -> Vec<(String, String)> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+fn compare_version(
+    cli_version: &str,
+    crate_name: &str,
+    lock_packages: &[(String, String)],
+) -> Option<Issue> {
+    let lock_version = lock_packages
+        .iter()
+        .find(|(name, _)| name == crate_name)
+        .map(|(_, version)| version.as_str());
+
+    let lock_version = lock_version?;
+
+    if cli_version != lock_version {
+        Some(Issue {
+            title: format!("Fix {crate_name} version mismatch"),
+            details: vec![format!(
+                "CLI reports {cli_version}, Cargo.lock has {lock_version}"
+            )],
+        })
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- parse_lock_packages ---
+
+    #[test]
+    fn parse_lock_basic() {
+        let content = r#"
+[[package]]
+name = "serde"
+version = "1.0.200"
+
+[[package]]
+name = "tokio"
+version = "1.37.0"
+"#;
+        let pkgs = parse_lock_packages(content);
+        assert_eq!(pkgs.len(), 2);
+        assert_eq!(pkgs[0], ("serde".into(), "1.0.200".into()));
+        assert_eq!(pkgs[1], ("tokio".into(), "1.37.0".into()));
+    }
+
+    #[test]
+    fn parse_lock_empty() {
+        let pkgs = parse_lock_packages("");
+        assert!(pkgs.is_empty());
+    }
+
+    #[test]
+    fn parse_lock_no_package_key() {
+        let content = r#"
+[metadata]
+foo = "bar"
+"#;
+        let pkgs = parse_lock_packages(content);
+        assert!(pkgs.is_empty());
+    }
+
+    #[test]
+    fn parse_lock_skips_incomplete_entries() {
+        let content = r#"
+[[package]]
+name = "incomplete"
+
+[[package]]
+name = "ok"
+version = "1.0"
+"#;
+        let pkgs = parse_lock_packages(content);
+        assert_eq!(pkgs.len(), 1);
+        assert_eq!(pkgs[0].0, "ok");
+    }
+
+    // --- compare_version ---
+
+    #[test]
+    fn compare_version_match() {
+        let pkgs = vec![("wasm-bindgen".into(), "0.2.90".into())];
+        assert!(compare_version("0.2.90", "wasm-bindgen", &pkgs).is_none());
+    }
+
+    #[test]
+    fn compare_version_mismatch() {
+        let pkgs = vec![("wasm-bindgen".into(), "0.2.90".into())];
+        let issue = compare_version("0.2.89", "wasm-bindgen", &pkgs);
+        assert!(issue.is_some());
+        let issue = issue.unwrap();
+        assert!(issue.title.contains("wasm-bindgen"));
+        assert!(issue.details[0].contains("0.2.89"));
+        assert!(issue.details[0].contains("0.2.90"));
+    }
+
+    #[test]
+    fn compare_version_crate_not_in_lock() {
+        let pkgs = vec![("serde".into(), "1.0".into())];
+        assert!(compare_version("1.0", "missing-crate", &pkgs).is_none());
+    }
+
+    #[test]
+    fn compare_version_empty_packages() {
+        assert!(compare_version("1.0", "any", &[]).is_none());
+    }
+
+    #[test]
+    fn compare_version_multiple_packages() {
+        let pkgs = vec![
+            ("alpha".into(), "1.0".into()),
+            ("beta".into(), "2.0".into()),
+            ("gamma".into(), "3.0".into()),
+        ];
+        assert!(compare_version("2.0", "beta", &pkgs).is_none());
+        assert!(compare_version("999", "beta", &pkgs).is_some());
+    }
 }
