@@ -6,6 +6,7 @@ mod expand;
 mod file_size;
 mod freshness;
 mod unused_deps;
+mod unused_pub;
 mod workspace;
 
 pub(crate) struct Issue {
@@ -47,6 +48,9 @@ fn main() {
     }
     if let Some(ref uc) = config.unused_deps {
         issues.extend(unused_deps::check(uc));
+    }
+    if let Some(ref up) = config.unused_pub {
+        issues.extend(unused_pub::check(up));
     }
 
     if issues.is_empty() {

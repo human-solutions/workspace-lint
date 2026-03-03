@@ -12,6 +12,13 @@ ignore = "0.4"
 globset = "0.4"
 strip-ansi-escapes = "0.2"
 regex = "1"
+scip = "0.6"
+protobuf = "3"
+syn = { version = "2", features = ["full", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [dev-dependencies.cargo-husky]
 version = "1"

@@ -18,6 +18,8 @@ pub struct Config {
     pub cli_crate_version: Option<CliCrateVersionConfig>,
     #[serde(default, rename = "unused-deps")]
     pub unused_deps: Option<UnusedDepsConfig>,
+    #[serde(default, rename = "unused-pub")]
+    pub unused_pub: Option<UnusedPubConfig>,
 }
 
 #[derive(Deserialize, Default)]
@@ -57,6 +59,41 @@ pub struct CliCrateVersionRule {
 pub struct UnusedDepsConfig {
     #[serde(default)]
     pub ignore: Vec<String>,
+}
+
+#[derive(Deserialize, Default)]
+pub struct UnusedPubConfig {
+    #[serde(default, rename = "scip-index")]
+    pub scip_index: Option<String>,
+    #[serde(default, rename = "exclude-crates")]
+    pub exclude_crates: Vec<String>,
+    #[serde(default)]
+    pub allowlist: Vec<String>,
+    #[serde(default)]
+    pub kinds: Vec<String>,
+    #[serde(default, rename = "exclude-paths")]
+    pub exclude_paths: Vec<String>,
+    #[serde(default = "CargoFeatures::default_all", rename = "cargo-features")]
+    pub cargo_features: CargoFeatures,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
+#[serde(untagged)]
+pub enum CargoFeatures {
+    Keyword(String),
+    List(Vec<String>),
+}
+
+impl Default for CargoFeatures {
+    fn default() -> Self {
+        Self::default_all()
+    }
+}
+
+impl CargoFeatures {
+    fn default_all() -> Self {
+        CargoFeatures::Keyword("all".to_string())
+    }
 }
 
 #[derive(Deserialize)]
@@ -190,6 +227,14 @@ crate = "wasm-bindgen"
 
 [unused-deps]
 ignore = ["prost", "tonic"]
+
+[unused-pub]
+scip-index = "index.scip"
+exclude-crates = ["api", "sdk"]
+allowlist = ["*Error", "main"]
+kinds = ["function", "struct"]
+exclude-paths = ["generated/**"]
+cargo-features = "all"
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -229,6 +274,12 @@ ignore = ["prost", "tonic"]
 
         let ud = config.unused_deps.unwrap();
         assert_eq!(ud.ignore, &["prost", "tonic"]);
+
+        let up = config.unused_pub.unwrap();
+        assert_eq!(up.scip_index.as_deref(), Some("index.scip"));
+        assert_eq!(up.exclude_crates, &["api", "sdk"]);
+        assert_eq!(up.allowlist, &["*Error", "main"]);
+        assert_eq!(up.kinds, &["function", "struct"]);
     }
 
     #[test]
@@ -241,6 +292,7 @@ ignore = ["prost", "tonic"]
         assert!(config.expand.is_none());
         assert!(config.cli_crate_version.is_none());
         assert!(config.unused_deps.is_none());
+        assert!(config.unused_pub.is_none());
     }
 
     #[test]
@@ -274,6 +326,59 @@ max-code-lines = 400
         let config: Config = toml::from_str(toml).unwrap();
         let ud = config.unused_deps.unwrap();
         assert!(ud.ignore.is_empty());
+    }
+
+    #[test]
+    fn parse_unused_pub_defaults() {
+        let toml = r#"
+[unused-pub]
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let up = config.unused_pub.unwrap();
+        assert!(up.scip_index.is_none());
+        assert!(up.exclude_crates.is_empty());
+        assert!(up.allowlist.is_empty());
+        assert!(up.kinds.is_empty());
+        assert!(up.exclude_paths.is_empty());
+        assert_eq!(up.cargo_features, CargoFeatures::Keyword("all".to_string()));
+    }
+
+    #[test]
+    fn parse_unused_pub_full() {
+        let toml = r#"
+[unused-pub]
+scip-index = "target/index.scip"
+exclude-crates = ["api"]
+allowlist = ["Error", "*Builder"]
+kinds = ["function", "method"]
+exclude-paths = ["generated/**", "proto/**"]
+cargo-features = "default"
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let up = config.unused_pub.unwrap();
+        assert_eq!(up.scip_index.as_deref(), Some("target/index.scip"));
+        assert_eq!(up.exclude_crates, &["api"]);
+        assert_eq!(up.allowlist, &["Error", "*Builder"]);
+        assert_eq!(up.kinds, &["function", "method"]);
+        assert_eq!(up.exclude_paths, &["generated/**", "proto/**"]);
+        assert_eq!(
+            up.cargo_features,
+            CargoFeatures::Keyword("default".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_unused_pub_cargo_features_list() {
+        let toml = r#"
+[unused-pub]
+cargo-features = ["feat1", "feat2"]
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let up = config.unused_pub.unwrap();
+        assert_eq!(
+            up.cargo_features,
+            CargoFeatures::List(vec!["feat1".to_string(), "feat2".to_string()])
+        );
     }
 
     #[test]
