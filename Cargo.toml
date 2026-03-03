@@ -11,6 +11,7 @@ tokei = { version = "14", default-features = false }
 ignore = "0.4"
 globset = "0.4"
 strip-ansi-escapes = "0.2"
+clap = { version = "4", features = ["derive"] }
 regex = "1"
 scip = "0.6"
 protobuf = "3"
