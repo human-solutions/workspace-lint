@@ -93,6 +93,9 @@ pub enum CheckRule {
     },
     /// Check for unused public items via SCIP index
     UnusedPub {
+        /// Only run this check in CI environments (when CI env var is set)
+        #[arg(long, default_value_t = false)]
+        on_ci_only: bool,
         /// Path to SCIP index file
         #[arg(long)]
         scip_index: Option<String>,
@@ -167,6 +170,7 @@ impl CheckRule {
     }
 
     pub fn into_unused_pub_config(
+        on_ci_only: bool,
         scip_index: Option<String>,
         exclude_crates: Vec<String>,
         allowlist: Vec<String>,
@@ -184,6 +188,7 @@ impl CheckRule {
             CargoFeatures::List(cargo_features)
         };
         UnusedPubConfig {
+            on_ci_only,
             scip_index,
             exclude_crates,
             allowlist,

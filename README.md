@@ -103,6 +103,7 @@ Detects unused `pub` items across crate boundaries using a SCIP index (generated
 
 ```toml
 [unused-pub]
+on-ci-only = true
 scip-index = "index.scip"
 exclude-crates = ["api"]
 allowlist = ["*Error", "main"]
@@ -110,6 +111,16 @@ kinds = ["function", "struct"]
 exclude-paths = ["generated/**"]
 cargo-features = "all"
 ```
+
+| Option | Description |
+|--------|-------------|
+| `on-ci-only` | When `true`, only runs this check when the `CI` environment variable is set. Useful because generating the SCIP index is expensive. Default: `false`. |
+| `scip-index` | Path to a pre-generated SCIP index file. If omitted, runs `rust-analyzer scip .` automatically. |
+| `exclude-crates` | Crate names to skip. |
+| `allowlist` | Glob patterns for item names to ignore (e.g. `*Error`). |
+| `kinds` | Item kinds to check: `function`, `method`, `struct`, `enum`, `const`, `trait`, `type`, `mod`, `static`, `macro`, `field`, `variant`. |
+| `exclude-paths` | Glob patterns for file paths to skip. |
+| `cargo-features` | Cargo features to enable when generating the index: `"all"` (default), `"default"`, or a list of specific features. |
 
 ## Commands
 

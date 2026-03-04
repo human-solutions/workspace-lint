@@ -114,6 +114,7 @@ fn run_single_check(rule: CheckRule) -> Vec<Issue> {
             unused_deps::check(&config)
         }
         CheckRule::UnusedPub {
+            on_ci_only,
             scip_index,
             exclude_crates,
             allowlist,
@@ -122,6 +123,7 @@ fn run_single_check(rule: CheckRule) -> Vec<Issue> {
             cargo_features,
         } => {
             let config = CheckRule::into_unused_pub_config(
+                on_ci_only,
                 scip_index,
                 exclude_crates,
                 allowlist,

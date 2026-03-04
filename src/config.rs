@@ -63,6 +63,8 @@ pub struct UnusedDepsConfig {
 
 #[derive(Deserialize, Default)]
 pub struct UnusedPubConfig {
+    #[serde(default, rename = "on-ci-only")]
+    pub on_ci_only: bool,
     #[serde(default, rename = "scip-index")]
     pub scip_index: Option<String>,
     #[serde(default, rename = "exclude-crates")]
@@ -340,12 +342,24 @@ max-code-lines = 400
 "#;
         let config: Config = toml::from_str(toml).unwrap();
         let up = config.unused_pub.unwrap();
+        assert!(!up.on_ci_only);
         assert!(up.scip_index.is_none());
         assert!(up.exclude_crates.is_empty());
         assert!(up.allowlist.is_empty());
         assert!(up.kinds.is_empty());
         assert!(up.exclude_paths.is_empty());
         assert_eq!(up.cargo_features, CargoFeatures::Keyword("all".to_string()));
+    }
+
+    #[test]
+    fn parse_unused_pub_on_ci_only() {
+        let toml = r#"
+[unused-pub]
+on-ci-only = true
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let up = config.unused_pub.unwrap();
+        assert!(up.on_ci_only);
     }
 
     #[test]

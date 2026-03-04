@@ -12,6 +12,9 @@ use syn::Visibility;
 use syn::visit::Visit;
 
 pub fn check(config: &UnusedPubConfig) -> Vec<Issue> {
+    if config.on_ci_only && std::env::var("CI").is_err() {
+        return Vec::new();
+    }
     let index = load_index(config);
     let mut decl_map = build_declaration_map(&index);
     mark_used_symbols(&index, &mut decl_map);
