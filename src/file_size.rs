@@ -56,7 +56,7 @@ pub fn check(config: &FileSizeConfig) -> Vec<Issue> {
         if viols.is_empty() {
             continue;
         }
-        viols.sort_by(|a, b| b.1.cmp(&a.1));
+        viols.sort_by_key(|v| std::cmp::Reverse(v.1));
 
         let rule = &config.rules[rule_idx];
         let mut details: Vec<String> = viols
@@ -141,7 +141,7 @@ mod tests {
             if viols.is_empty() {
                 continue;
             }
-            viols.sort_by(|a, b| b.1.cmp(&a.1));
+            viols.sort_by_key(|v| std::cmp::Reverse(v.1));
 
             let rule = &config.rules[rule_idx];
             let details: Vec<String> = viols

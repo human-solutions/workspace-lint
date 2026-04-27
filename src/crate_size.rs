@@ -45,7 +45,7 @@ pub fn check(config: &CrateSizeConfig) -> Vec<Issue> {
         }
 
         if !violations.is_empty() {
-            violations.sort_by(|a, b| b.1.cmp(&a.1));
+            violations.sort_by_key(|v| std::cmp::Reverse(v.1));
 
             let details: Vec<String> = violations
                 .iter()
@@ -127,7 +127,7 @@ mod tests {
         }
 
         let mut sorted = violations;
-        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.sort_by_key(|v| std::cmp::Reverse(v.1));
 
         let details: Vec<String> = sorted
             .iter()
