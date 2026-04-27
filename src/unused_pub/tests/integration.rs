@@ -77,7 +77,8 @@ fn integration_same_crate_reference_suggests_pub_crate() {
     let config = make_config_with_index(tmp.path().to_str().unwrap(), vec![], vec![], vec![]);
     let issues = check(&config);
     assert_eq!(issues.len(), 1);
-    assert!(issues[0].details.iter().any(|d| d.contains("pub(crate)")));
+    assert!(issues[0].title.contains("pub(crate)"));
+    assert!(issues[0].details.iter().any(|d| d.contains("`used`")));
 }
 
 #[test]
@@ -348,6 +349,39 @@ fn integration_issues_grouped_by_crate() {
     let titles: Vec<&str> = issues.iter().map(|i| i.title.as_str()).collect();
     assert!(titles.iter().any(|t| t.contains("crate-a")));
     assert!(titles.iter().any(|t| t.contains("crate-b")));
+}
+
+#[test]
+fn integration_removal_section_listed_before_tighten_section() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let src_path = dir.path().join("src/lib.rs");
+    std::fs::create_dir_all(src_path.parent().unwrap()).unwrap();
+    std::fs::write(&src_path, "pub fn unused() {}\npub fn used() {}\n").unwrap();
+
+    let full_path = src_path.to_str().unwrap();
+    let sym_unused = "rust-analyzer cargo mycrate 0.1.0 mycrate/unused()";
+    let sym_used = "rust-analyzer cargo mycrate 0.1.0 mycrate/used()";
+
+    let doc = make_doc(
+        full_path,
+        vec![
+            make_symbol(sym_unused, Kind::Function, "unused"),
+            make_symbol(sym_used, Kind::Function, "used"),
+        ],
+        vec![
+            make_occurrence(sym_unused, SymbolRole::Definition as i32, 0),
+            make_occurrence(sym_used, SymbolRole::Definition as i32, 1),
+            make_occurrence(sym_used, 0, 5), // same-crate reference
+        ],
+    );
+    let index = make_index(vec![doc]);
+    let tmp = write_scip_index(&index);
+
+    let config = make_config_with_index(tmp.path().to_str().unwrap(), vec![], vec![], vec![]);
+    let issues = check(&config);
+    assert_eq!(issues.len(), 2);
+    assert!(issues[0].title.contains("removal candidate"));
+    assert!(issues[1].title.contains("pub(crate)"));
 }
 
 #[test]

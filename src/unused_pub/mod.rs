@@ -36,7 +36,8 @@ pub fn check(config: &UnusedPubConfig) -> Vec<Issue> {
     let allowlist = build_allowlist(&config.allowlist);
     let exclude_paths = build_path_filter(&config.exclude_paths);
 
-    let mut by_crate: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut removal_by_crate: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut tighten_by_crate: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
     for entry in decl_map.values() {
         // Skip items used cross-crate
@@ -107,35 +108,52 @@ pub fn check(config: &UnusedPubConfig) -> Vec<Issue> {
 
         let line_display = def_line + 1; // convert 0-based to 1-based for display
         let kind_str = format_kind(entry.kind);
-        let suggestion = if entry.used_same_crate {
-            " (only used within same crate, consider `pub(crate)`)"
-        } else {
-            " (consider removing or making private)"
-        };
-        by_crate.entry(crate_name).or_default().push(format!(
-            "{kind_str} `{}` ({}:{}){suggestion}",
+        let item = format!(
+            "{kind_str} `{}` ({}:{})",
             entry.display_name, entry.relative_path, line_display
-        ));
+        );
+        if entry.used_same_crate {
+            tighten_by_crate.entry(crate_name).or_default().push(item);
+        } else {
+            removal_by_crate.entry(crate_name).or_default().push(item);
+        }
     }
 
-    by_crate
-        .into_iter()
-        .map(|(crate_name, items)| {
-            let mut details = items;
-            details.push(String::new());
-            details.push(
-                "Note: #[cfg]-gated items, proc-macro usage, and re-exports may cause false positives.".into(),
-            );
-            Issue {
-                title: format!(
-                    "Unused pub items in crate `{crate_name}` ({} item{})",
-                    details.len() - 2,
-                    if details.len() - 2 == 1 { "" } else { "s" }
-                ),
-                details,
-            }
-        })
-        .collect()
+    let note =
+        "Note: #[cfg]-gated items, proc-macro usage, and re-exports may cause false positives.";
+    let mut issues: Vec<Issue> = Vec::new();
+
+    // Removal candidates first — items with no observed references at all.
+    for (crate_name, items) in removal_by_crate {
+        let n = items.len();
+        let mut details = items;
+        details.push(String::new());
+        details.push(note.into());
+        issues.push(Issue {
+            title: format!(
+                "Unused pub items in crate `{crate_name}` — {n} removal candidate{} (appears unused, consider removing)",
+                if n == 1 { "" } else { "s" }
+            ),
+            details,
+        });
+    }
+
+    // Then visibility-tightening candidates — items only used within the same crate.
+    for (crate_name, items) in tighten_by_crate {
+        let n = items.len();
+        let mut details = items;
+        details.push(String::new());
+        details.push(note.into());
+        issues.push(Issue {
+            title: format!(
+                "Unused pub items in crate `{crate_name}` — {n} item{} only used within same crate (consider `pub(crate)`)",
+                if n == 1 { "" } else { "s" }
+            ),
+            details,
+        });
+    }
+
+    issues
 }
 
 fn load_index(config: &UnusedPubConfig) -> Index {
